@@ -320,11 +320,38 @@
     text-transform: uppercase;
     line-height: 1.2;
   }
-  .doc-subtitulo {
-    font-size: 11px;
-    opacity: 0.78;
-    letter-spacing: 0.04em;
-    margin-top: 2px;
+  .doc-titulo-data {
+    font-size: 13px;
+    font-weight: 400;
+    opacity: 0.85;
+    margin-top: 4px;
+    letter-spacing: 0.03em;
+  }
+  .doc-titulo-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 400;
+    opacity: 0.85;
+    margin-top: 5px;
+    letter-spacing: 0.03em;
+  }
+  .doc-titulo-sep { opacity: 0.5; }
+  .doc-header-left {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    min-width: 130px;
+  }
+  .doc-logo-img {
+    height: 48px;
+    width: auto;
+    object-fit: contain;
+    border-radius: 3px;
+    background: white;
+    padding: 3px 5px;
   }
   .doc-num {
     margin-left: auto;
@@ -545,25 +572,50 @@
   .doc-footer-code { font-size: 9px; color: #aaa; font-style: italic; }
 
   /* ── PRINT ── */
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
   @media print {
-    body { background: white; }
-    .app-header, .main-layout > .panel-form, .panel-preview > .preview-toolbar { display: none !important; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+    html, body {
+      width: 210mm;
+      height: 297mm;
+      background: white;
+      margin: 0;
+      padding: 0;
+    }
+
+    .app-header,
+    .main-layout > .panel-form,
+    .panel-preview > .preview-toolbar { display: none !important; }
+
     .main-layout {
       display: block;
       margin: 0;
       padding: 0;
       max-width: 100%;
     }
+
     .panel-preview {
       background: white;
       border: none;
       padding: 0;
+      margin: 0;
     }
+
     #doc-wrapper {
       box-shadow: none;
-      max-width: 100%;
       border-radius: 0;
+      width: 210mm;
+      min-height: 297mm;
+      max-width: 210mm;
+      margin: 0;
+      padding: 0;
     }
+
     .doc-recorte { page-break-inside: avoid; }
   }
 
@@ -716,13 +768,18 @@
       <!-- CABECEIRA DOCUMENTO -->
       <div class="doc-header">
         <div class="doc-header-left">
-          <div class="doc-header-brand-text">Xunta<br>de Galicia</div>
+          <img src="data:image/jpeg;base64,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" alt="Logo CEIP" class="doc-logo-img">
           <div class="doc-header-centro" id="d-centro">CEIP Plurilingüe<br>de Monforte de Lemos</div>
         </div>
         <div class="doc-header-sep"></div>
         <div class="doc-header-right">
-          <div class="doc-titulo">Autorización de saída escolar</div>
-          <div class="doc-subtitulo">Documento dirixido ás familias · Para cubrir e devolver ao centro</div>
+          <div class="doc-subtitulo" style="opacity:0.7; margin-bottom:4px; font-size:10px; letter-spacing:0.1em; text-transform:uppercase;">Autorización de saída escolar</div>
+          <div class="doc-titulo" id="d-titulo-actividade">–</div>
+          <div class="doc-titulo-meta">
+            <span id="d-titulo-data"></span>
+            <span class="doc-titulo-sep" id="d-titulo-sep" style="display:none;">·</span>
+            <span id="d-titulo-curso"></span>
+          </div>
         </div>
       </div>
       <div class="doc-stripe"></div>
@@ -841,8 +898,15 @@
       return c.value;
     });
 
-    // Cabeceira
+    // Cabeceira: título actividade e data
     document.getElementById('d-centro').innerHTML = centro.replace('CEIP Plurilingüe de Monforte de Lemos', 'CEIP Plurilingüe<br>de Monforte de Lemos');
+    document.getElementById('d-titulo-actividade').textContent = den.trim() || 'Saída escolar';
+    const tData = document.getElementById('d-titulo-data');
+    const tCurso = document.getElementById('d-titulo-curso');
+    const tSep = document.getElementById('d-titulo-sep');
+    tData.textContent = dataSaida ? fmt(dataSaida) : '';
+    tCurso.textContent = curso.trim() || '';
+    tSep.style.display = (dataSaida && curso.trim()) ? 'inline' : 'none';
 
     // ── TEXTO NARRATIVO ──
     const d = (txt) => `<span class="dato">${txt}</span>`;
@@ -862,7 +926,7 @@
         if (horaSaida) p += ` ás ${d(horaSaida + 'h')}`;
         p += ', o alumnado';
         if (curso) p += ` de ${d(curso)}`;
-        if (tenDen) p += ` realizará ${d(tenDen)}`;
+        if (tenDen) p += ` realizará a seguinte actividade: ${d(tenDen)}`;
         else p += ' realizará unha saída escolar';
         if (tenDest) p += ` en ${d(tenDest)}`;
         p += '.';
