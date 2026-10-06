@@ -1119,15 +1119,19 @@
             par([new TextRun({ text: `AUTORIZACIÓN — ${den}`, bold: true, size: 22 })], { after: 200, align: AlignmentType.LEFT }),
             par([
               new TextRun({ text: 'Eu, pai/nai/titor/a do/da alumno/a ', size: 22 }),
-              new TextRun({ text: '_'.repeat(32), size: 22 }),
+              new TextRun({ text: '_'.repeat(34), size: 22 }),
               new TextRun({ text: ` de ${curso || '___'}`, size: 22 })
-            ], { after: 160 }),
+            ], { after: 200 }),
             par([
               new TextRun({ text: 'AUTORIZO', bold: true, size: 22 }),
-              new TextRun({ text: ` a participar en: ${den}${dest ? ' en ' + dest : ''}${dataSaida ? ' o día ' + fmt(dataSaida) : ''}.`, size: 22 })
+              new TextRun({ text: ` a participar en: ${den}${dest ? ' en ' + dest : ''}${dataSaida ? ', o día ' + fmt(dataSaida) : ''}.`, size: 22 })
             ], { after: 400 }),
             par([
-              new TextRun({ text: 'Sinatura: _______________________________   En Monforte de Lemos, a ____ de ______________ de ______', size: 22 })
+              new TextRun({ text: 'Sinatura: ', size: 22 }),
+              new TextRun({ text: '_'.repeat(34), size: 22 })
+            ], { after: 200 }),
+            par([
+              new TextRun({ text: `En Monforte de Lemos, a _____ de _______________ de ${dataSaida ? dataSaida.split('-')[0] : '______'}`, size: 22 })
             ], { after: 160 })
           ]
         }]
