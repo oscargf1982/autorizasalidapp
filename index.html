@@ -1024,9 +1024,19 @@
     btn.innerHTML = btnSVG + ' Xerando…';
 
     try {
-      // Importar docx.js como módulo ESM desde esm.sh
-      const { Document, Packer, Paragraph, TextRun, AlignmentType, BorderStyle, UnderlineType } =
-        await import('https://esm.sh/docx@8.5.0');
+      // Cargar docx UMD (servido localmente xunto co HTML)
+      if (!window.docx || !window.docx.Document) {
+        await new Promise((resolve, reject) => {
+          const s = document.createElement('script');
+          // Ruta relativa ao mesmo directorio que o index.html
+          s.src = new URL('docx.umd.js', window.location.href).href;
+          s.onload = resolve;
+          s.onerror = reject;
+          document.head.appendChild(s);
+        });
+      }
+      if (!window.docx || !window.docx.Document) throw new Error('Non se puido cargar docx.umd.js');
+      const { Document, Packer, Paragraph, TextRun, AlignmentType, BorderStyle } = window.docx;
 
       // Recoller datos do formulario
       const centro     = document.getElementById('centro').value || 'CEIP Plurilingüe de Monforte de Lemos';
