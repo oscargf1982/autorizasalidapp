@@ -1016,7 +1016,7 @@
   // Carga inicial
   actualizarDoc();
 
-  // ── XERACIÓN DE DOCX (usando html-docx-js: converte HTML→DOCX) ──
+  // ── XERACIÓN DE DOCX con docx.js (ESM via CDN) ──
   async function xerarDocx() {
     const btn = document.querySelector('.btn-docx');
     const btnSVG = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>';
@@ -1024,24 +1024,9 @@
     btn.innerHTML = btnSVG + ' Xerando…';
 
     try {
-      // Cargar html-docx-js desde CDN se non está cargada
-      if (!window.htmlDocx) {
-        await new Promise((resolve, reject) => {
-          const s = document.createElement('script');
-          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html-docx-js/0.3.1/html-docx.js';
-          s.onload = () => resolve();
-          s.onerror = () => {
-            const s2 = document.createElement('script');
-            s2.src = 'https://cdn.jsdelivr.net/npm/html-docx-js@0.3.1/dist/html-docx.js';
-            s2.onload = () => resolve();
-            s2.onerror = () => reject(new Error('Non se puido cargar a librería. Comproba a conexión.'));
-            document.head.appendChild(s2);
-          };
-          document.head.appendChild(s);
-        });
-      }
-
-      if (!window.htmlDocx) throw new Error('A librería htmlDocx non está dispoñible.');
+      // Importar docx.js como módulo ESM desde esm.sh
+      const { Document, Packer, Paragraph, TextRun, AlignmentType, BorderStyle, UnderlineType } =
+        await import('https://esm.sh/docx@8.5.0');
 
       // Recoller datos do formulario
       const centro     = document.getElementById('centro').value || 'CEIP Plurilingüe de Monforte de Lemos';
@@ -1066,53 +1051,83 @@
       const outrosTexto = document.getElementById('outros_texto').value.trim();
       const transp = Array.from(cbs).map(c => c.value === 'Outros' && outrosTexto ? outrosTexto : c.value);
 
-      // Construír corpo narrativo
-      let narr = `<p>Estimadas familias,</p>`;
-      let p2 = `O alumnado`;
-      if (curso) p2 += ` de ${curso}`;
-      p2 += ` realizará a seguinte actividade: <strong>${den}</strong>`;
-      if (dest) p2 += ` en ${dest}`;
-      if (dataSaida) p2 += `, o día ${fmt(dataSaida)}`;
-      p2 += `.`;
-      if (transp.length) p2 += ` O desprazamento realizarase en ${transp.join(' e ')}.`;
-      if (custo) p2 += ` O custo da actividade é de <strong>${custo} €</strong>.`;
-      if (dataLimite) p2 += ` O importe deberá ser entregado antes do día ${fmt(dataLimite)}.`;
-      narr += `<p>${p2}</p>`;
-      if (material) narr += `<p>O alumnado deberá traer: ${material}.</p>`;
-      if (obs) narr += `<p>${obs}</p>`;
+      // Construír parágrafo narrativo
+      let corpo = 'O alumnado';
+      if (curso) corpo += ` de ${curso}`;
+      corpo += ` realizará a seguinte actividade: ${den}`;
+      if (dest) corpo += ` en ${dest}`;
+      if (dataSaida) corpo += `, o día ${fmt(dataSaida)}`;
+      corpo += '.';
+      if (transp.length) corpo += ` O desprazamento realizarase en ${transp.join(' e ')}.`;
+      if (custo) corpo += ` O custo da actividade é de ${custo} €.`;
+      if (dataLimite) corpo += ` O importe deberá ser entregado antes do día ${fmt(dataLimite)}.`;
 
-      // HTML completo para conversión
-      const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
-<style>
-  body { font-family: Arial, sans-serif; font-size: 11pt; margin: 2cm; }
-  h1 { color: #005a8e; font-size: 14pt; margin-bottom: 2pt; }
-  .subtitulo { color: #5a5a5a; font-size: 9pt; font-style: italic; margin-bottom: 16pt; }
-  h2 { color: #007bc4; font-size: 18pt; margin-bottom: 4pt; }
-  .meta { color: #5a5a5a; font-size: 11pt; margin-bottom: 24pt; }
-  p { text-align: justify; margin-bottom: 10pt; line-height: 1.5; }
-  .recorte { border-top: 1px dashed #999; margin-top: 32pt; padding-top: 16pt; }
-  .recorte h3 { font-size: 11pt; text-transform: uppercase; margin-bottom: 10pt; }
-  .recorte p { margin-bottom: 8pt; }
-  .liña-sinatura { border-bottom: 1px solid #333; display: inline-block; width: 200pt; }
-</style></head><body>
-<h1>${centro}</h1>
-<p class="subtitulo">Autorización de saída escolar</p>
-<h2>${den}</h2>
-<p class="meta">${[dataSaida ? fmt(dataSaida) : '', curso].filter(Boolean).join('  ·  ')}</p>
-${narr}
-<div class="recorte">
-  <h3>✂ Autorización — ${den}</h3>
-  <p>Eu, pai/nai/titor/a do/da alumno/a <span class="liña-sinatura">&nbsp;</span> de ${curso || '___'}</p>
-  <p><strong>AUTORIZO</strong> a participar en: ${den}${dest ? ' en ' + dest : ''}${dataSaida ? ' o día ' + fmt(dataSaida) : ''}.</p>
-  <p>Sinatura: <span class="liña-sinatura">&nbsp;</span> &nbsp;&nbsp;&nbsp; En Monforte de Lemos, a ____ de ______________ de ______</p>
-</div>
-</body></html>`;
+      // Helper: parágrafo con espazo inferior
+      const par = (children, opts = {}) => new Paragraph({
+        children,
+        spacing: { after: opts.after ?? 160 },
+        alignment: opts.align ?? AlignmentType.JUSTIFIED,
+        ...opts.extra
+      });
 
-      const blob = window.htmlDocx.asBlob(html);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `autorizacion_${den.replace(/[^a-z0-9]/gi,'_').toLowerCase()}.docx`;
+      // Helper: liña divisoria punteada (borde superior)
+      const divisor = () => new Paragraph({
+        children: [],
+        spacing: { before: 400, after: 240 },
+        border: { top: { style: BorderStyle.DASHED, size: 6, color: '999999' } }
+      });
+
+      const doc = new Document({
+        sections: [{
+          properties: {
+            page: {
+              size: { width: 11906, height: 16838 },   // A4 en DXA
+              margin: { top: 1134, bottom: 1134, left: 1418, right: 1134 }
+            }
+          },
+          children: [
+            // ── CABECEIRA ──
+            par([new TextRun({ text: centro, bold: true, size: 28, color: '005a8e' })], { after: 60, align: AlignmentType.LEFT }),
+            par([new TextRun({ text: 'Autorización de saída escolar', size: 18, color: '5a5a5a', italics: true })], { after: 280, align: AlignmentType.LEFT }),
+
+            // ── TÍTULO ACTIVIDADE ──
+            par([new TextRun({ text: den, bold: true, size: 40, color: '007bc4' })], { after: 60, align: AlignmentType.LEFT }),
+            ...([dataSaida || curso] [0] ? [par([
+              new TextRun({ text: dataSaida ? fmt(dataSaida) : '', size: 22, color: '5a5a5a' }),
+              ...(dataSaida && curso ? [new TextRun({ text: '  ·  ', size: 22, color: 'aaaaaa' })] : []),
+              new TextRun({ text: curso, size: 22, color: '5a5a5a' })
+            ], { after: 400, align: AlignmentType.LEFT })] : []),
+
+            // ── CORPO ──
+            par([new TextRun({ text: 'Estimadas familias,', size: 24 })], { after: 160 }),
+            par([new TextRun({ text: corpo, size: 24 })], { after: material || obs ? 160 : 480 }),
+            ...(material ? [par([new TextRun({ text: `O alumnado deberá traer: ${material}.`, size: 24 })], { after: obs ? 160 : 480 })] : []),
+            ...(obs      ? [par([new TextRun({ text: obs, size: 24 })], { after: 480 })]                                                    : []),
+
+            // ── RECORTE / SINATURA ──
+            divisor(),
+            par([new TextRun({ text: `AUTORIZACIÓN — ${den}`, bold: true, size: 22 })], { after: 200, align: AlignmentType.LEFT }),
+            par([
+              new TextRun({ text: 'Eu, pai/nai/titor/a do/da alumno/a ', size: 22 }),
+              new TextRun({ text: '_'.repeat(32), size: 22 }),
+              new TextRun({ text: ` de ${curso || '___'}`, size: 22 })
+            ], { after: 160 }),
+            par([
+              new TextRun({ text: 'AUTORIZO', bold: true, size: 22 }),
+              new TextRun({ text: ` a participar en: ${den}${dest ? ' en ' + dest : ''}${dataSaida ? ' o día ' + fmt(dataSaida) : ''}.`, size: 22 })
+            ], { after: 400 }),
+            par([
+              new TextRun({ text: 'Sinatura: _______________________________   En Monforte de Lemos, a ____ de ______________ de ______', size: 22 })
+            ], { after: 160 })
+          ]
+        }]
+      });
+
+      const blob = await Packer.toBlob(doc);
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = `autorizacion_${den.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.docx`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
