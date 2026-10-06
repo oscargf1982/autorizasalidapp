@@ -1016,37 +1016,43 @@
   // Carga inicial
   actualizarDoc();
 
-  // ── XERACIÓN DE DOCX ──
+  // ── XERACIÓN DE DOCX (usando html-docx-js: converte HTML→DOCX) ──
   async function xerarDocx() {
     const btn = document.querySelector('.btn-docx');
+    const btnSVG = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>';
     btn.disabled = true;
-    btn.textContent = 'Xerando...';
+    btn.innerHTML = btnSVG + ' Xerando…';
 
     try {
-      // Cargar librería docx dinamicamente
-      await new Promise((resolve, reject) => {
-        if (window.docx) { resolve(); return; }
-        const s = document.createElement('script');
-        s.src = 'https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.min.js';
-        s.onload = resolve;
-        s.onerror = reject;
-        document.head.appendChild(s);
-      });
+      // Cargar html-docx-js desde CDN se non está cargada
+      if (!window.htmlDocx) {
+        await new Promise((resolve, reject) => {
+          const s = document.createElement('script');
+          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html-docx-js/0.3.1/html-docx.js';
+          s.onload = () => resolve();
+          s.onerror = () => {
+            const s2 = document.createElement('script');
+            s2.src = 'https://cdn.jsdelivr.net/npm/html-docx-js@0.3.1/dist/html-docx.js';
+            s2.onload = () => resolve();
+            s2.onerror = () => reject(new Error('Non se puido cargar a librería. Comproba a conexión.'));
+            document.head.appendChild(s2);
+          };
+          document.head.appendChild(s);
+        });
+      }
 
-      const { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel,
-              Table, TableRow, TableCell, WidthType, BorderStyle, ShadingType,
-              PageOrientation, Header, Footer, ImageRun } = window.docx;
+      if (!window.htmlDocx) throw new Error('A librería htmlDocx non está dispoñible.');
 
       // Recoller datos do formulario
-      const centro   = document.getElementById('centro').value || 'CEIP Plurilingüe de Monforte de Lemos';
-      const den      = document.getElementById('denominacion').value || 'Saída escolar';
-      const dest     = document.getElementById('destino').value || '';
-      const curso    = document.getElementById('curso').value || '';
-      const dataSaida = document.getElementById('data_saida').value;
+      const centro     = document.getElementById('centro').value || 'CEIP Plurilingüe de Monforte de Lemos';
+      const den        = document.getElementById('denominacion').value || 'Saída escolar';
+      const dest       = document.getElementById('destino').value || '';
+      const curso      = document.getElementById('curso').value || '';
+      const dataSaida  = document.getElementById('data_saida').value;
       const dataLimite = document.getElementById('data_limite').value;
-      const custo    = document.getElementById('custo').value || '';
-      const material = document.getElementById('material').value || '';
-      const obs      = document.getElementById('observacions').value || '';
+      const custo      = document.getElementById('custo').value || '';
+      const material   = document.getElementById('material').value || '';
+      const obs        = document.getElementById('observacions').value || '';
 
       function fmt(d) {
         if (!d) return '';
@@ -1060,97 +1066,64 @@
       const outrosTexto = document.getElementById('outros_texto').value.trim();
       const transp = Array.from(cbs).map(c => c.value === 'Outros' && outrosTexto ? outrosTexto : c.value);
 
-      // Construír parágrafo narrativo
-      let texto = `Estimadas familias,\n\n`;
-      texto += `O alumnado`;
-      if (curso) texto += ` de ${curso}`;
-      texto += ` realizará a seguinte actividade: ${den}`;
-      if (dest) texto += ` en ${dest}`;
-      if (dataSaida) texto += `, o día ${fmt(dataSaida)}`;
-      texto += `.`;
-      if (transp.length) texto += ` O desprazamento realizarase en ${transp.join(' e ')}.`;
-      if (custo) texto += ` O custo da actividade é de ${custo} €.`;
-      if (dataLimite) texto += ` O importe deberá ser entregado antes do día ${fmt(dataLimite)}.`;
-      if (material) texto += `\n\nO alumnado deberá traer: ${material}.`;
-      if (obs) texto += `\n\n${obs}`;
+      // Construír corpo narrativo
+      let narr = `<p>Estimadas familias,</p>`;
+      let p2 = `O alumnado`;
+      if (curso) p2 += ` de ${curso}`;
+      p2 += ` realizará a seguinte actividade: <strong>${den}</strong>`;
+      if (dest) p2 += ` en ${dest}`;
+      if (dataSaida) p2 += `, o día ${fmt(dataSaida)}`;
+      p2 += `.`;
+      if (transp.length) p2 += ` O desprazamento realizarase en ${transp.join(' e ')}.`;
+      if (custo) p2 += ` O custo da actividade é de <strong>${custo} €</strong>.`;
+      if (dataLimite) p2 += ` O importe deberá ser entregado antes do día ${fmt(dataLimite)}.`;
+      narr += `<p>${p2}</p>`;
+      if (material) narr += `<p>O alumnado deberá traer: ${material}.</p>`;
+      if (obs) narr += `<p>${obs}</p>`;
 
-      const parrafos = texto.split('\n\n').map(p => p.trim()).filter(Boolean);
+      // HTML completo para conversión
+      const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>
+  body { font-family: Arial, sans-serif; font-size: 11pt; margin: 2cm; }
+  h1 { color: #005a8e; font-size: 14pt; margin-bottom: 2pt; }
+  .subtitulo { color: #5a5a5a; font-size: 9pt; font-style: italic; margin-bottom: 16pt; }
+  h2 { color: #007bc4; font-size: 18pt; margin-bottom: 4pt; }
+  .meta { color: #5a5a5a; font-size: 11pt; margin-bottom: 24pt; }
+  p { text-align: justify; margin-bottom: 10pt; line-height: 1.5; }
+  .recorte { border-top: 1px dashed #999; margin-top: 32pt; padding-top: 16pt; }
+  .recorte h3 { font-size: 11pt; text-transform: uppercase; margin-bottom: 10pt; }
+  .recorte p { margin-bottom: 8pt; }
+  .liña-sinatura { border-bottom: 1px solid #333; display: inline-block; width: 200pt; }
+</style></head><body>
+<h1>${centro}</h1>
+<p class="subtitulo">Autorización de saída escolar</p>
+<h2>${den}</h2>
+<p class="meta">${[dataSaida ? fmt(dataSaida) : '', curso].filter(Boolean).join('  ·  ')}</p>
+${narr}
+<div class="recorte">
+  <h3>✂ Autorización — ${den}</h3>
+  <p>Eu, pai/nai/titor/a do/da alumno/a <span class="liña-sinatura">&nbsp;</span> de ${curso || '___'}</p>
+  <p><strong>AUTORIZO</strong> a participar en: ${den}${dest ? ' en ' + dest : ''}${dataSaida ? ' o día ' + fmt(dataSaida) : ''}.</p>
+  <p>Sinatura: <span class="liña-sinatura">&nbsp;</span> &nbsp;&nbsp;&nbsp; En Monforte de Lemos, a ____ de ______________ de ______</p>
+</div>
+</body></html>`;
 
-      const doc = new Document({
-        sections: [{
-          properties: {
-            page: { size: { width: 11906, height: 16838 }, margin: { top: 1134, bottom: 1134, left: 1134, right: 1134 } }
-          },
-          children: [
-            // Cabeceira
-            new Paragraph({
-              children: [new TextRun({ text: centro, bold: true, size: 28, color: '005a8e' })],
-              spacing: { after: 80 }
-            }),
-            new Paragraph({
-              children: [new TextRun({ text: 'Autorización de saída escolar', size: 18, color: '5a5a5a', italics: true })],
-              spacing: { after: 200 }
-            }),
-            // Título actividade
-            new Paragraph({
-              children: [new TextRun({ text: den, bold: true, size: 36, color: '007bc4' })],
-              spacing: { after: 80 }
-            }),
-            ...(dataSaida || curso ? [new Paragraph({
-              children: [new TextRun({ text: [dataSaida ? fmt(dataSaida) : '', curso].filter(Boolean).join('  ·  '), size: 22, color: '5a5a5a' })],
-              spacing: { after: 400 }
-            })] : []),
-            // Corpo narrativo
-            ...parrafos.map((p, i) => new Paragraph({
-              children: [new TextRun({ text: p, size: 24 })],
-              spacing: { after: i < parrafos.length - 1 ? 200 : 600 },
-              alignment: AlignmentType.JUSTIFIED
-            })),
-            // Recorte - sinatura
-            new Paragraph({
-              children: [new TextRun({ text: '✂ ' + '─'.repeat(60), color: '999999', size: 18 })],
-              spacing: { before: 400, after: 300 }
-            }),
-            new Paragraph({
-              children: [new TextRun({ text: `AUTORIZACIÓN — ${den}`, bold: true, size: 22 })],
-              spacing: { after: 200 }
-            }),
-            new Paragraph({
-              children: [new TextRun({ text: `Eu, pai/nai/titor/a do/da alumno/a `, size: 22 }),
-                         new TextRun({ text: '__________________________________', size: 22 }),
-                         new TextRun({ text: ` de ${curso || '___'}`, size: 22 })],
-              spacing: { after: 160 }
-            }),
-            new Paragraph({
-              children: [new TextRun({ text: `AUTORIZO a participar en: ${den}${dest ? ' en ' + dest : ''}${dataSaida ? ' o día ' + fmt(dataSaida) : ''}.`, size: 22, bold: true })],
-              spacing: { after: 400 }
-            }),
-            new Paragraph({
-              children: [
-                new TextRun({ text: 'Sinatura:', size: 22 }),
-                new TextRun({ text: '                                        ', size: 22 }),
-                new TextRun({ text: `En ${centro.replace(/CEIP.*$/,'').trim() || 'Monforte de Lemos'}, a ____ de ______________ de ______`, size: 22 })
-              ],
-              spacing: { after: 200 }
-            }),
-          ]
-        }]
-      });
-
-      const blob = await Packer.toBlob(doc);
+      const blob = window.htmlDocx.asBlob(html);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `autorizacion_${den.replace(/\s+/g,'_').toLowerCase()}.docx`;
+      a.download = `autorizacion_${den.replace(/[^a-z0-9]/gi,'_').toLowerCase()}.docx`;
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
 
     } catch(e) {
       alert('Erro ao xerar o DOCX: ' + e.message);
       console.error(e);
     } finally {
       btn.disabled = false;
-      btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> Descargar Word';
+      btn.innerHTML = btnSVG + ' Descargar Word';
     }
   }
 
