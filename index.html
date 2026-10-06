@@ -449,6 +449,11 @@
     min-height: 16px;
   }
   .doc-field-full { grid-column: 1 / -1; border-right: none; }
+  .doc-datos-titulo {
+    font-size: 9px; font-weight: 700; letter-spacing: 1.2px;
+    color: #007bc4; text-transform: uppercase;
+    padding: 14px 0 6px 0; margin-top: 4px;
+  }
 
   .doc-info-box {
     background: var(--azul-claro);
@@ -799,6 +804,47 @@
           <!-- Generado por JS -->
         </p>
 
+        <!-- GRELLA DATOS DA ACTIVIDADE -->
+        <div class="doc-datos-titulo">DATOS DA ACTIVIDADE</div>
+        <div class="doc-grid" id="d-grid">
+          <div class="doc-field doc-field-full">
+            <div class="doc-field-label">DENOMINACIÓN</div>
+            <div class="doc-field-value" id="d-den">–</div>
+          </div>
+          <div class="doc-field">
+            <div class="doc-field-label">DESTINO</div>
+            <div class="doc-field-value" id="d-dest">–</div>
+          </div>
+          <div class="doc-field">
+            <div class="doc-field-label">CURSO</div>
+            <div class="doc-field-value" id="d-curso">–</div>
+          </div>
+          <div class="doc-field">
+            <div class="doc-field-label">DATA DE SAÍDA</div>
+            <div class="doc-field-value" id="d-data-s">–</div>
+          </div>
+          <div class="doc-field">
+            <div class="doc-field-label">REGRESO</div>
+            <div class="doc-field-value" id="d-data-r">–</div>
+          </div>
+          <div class="doc-field" id="d-nalum-field">
+            <div class="doc-field-label">Nº ALUMNADO</div>
+            <div class="doc-field-value" id="d-nalum">–</div>
+          </div>
+          <div class="doc-field" id="d-custo-field">
+            <div class="doc-field-label">CUSTO</div>
+            <div class="doc-field-value" id="d-custo">–</div>
+          </div>
+          <div class="doc-field doc-field-full" id="d-prof-field" style="display:none;">
+            <div class="doc-field-label">PROFESORADO ACOMPAÑANTE</div>
+            <div class="doc-field-value" id="d-prof">–</div>
+          </div>
+          <div class="doc-field doc-field-full" id="d-transp-field" style="display:none;">
+            <div class="doc-field-label">TRANSPORTE</div>
+            <div class="doc-field-value" id="d-transp">–</div>
+          </div>
+        </div>
+
         <div id="d-obx-bloque" class="doc-narrativa" style="display:none;">
           <span id="d-obxectivos"></span>
         </div>
@@ -976,6 +1022,37 @@
 
     const narrativaEl = document.getElementById('d-narrativa');
     narrativaEl.innerHTML = parrafos.map(p => `<p style="margin-bottom:10px;">${p}</p>`).join('');
+
+    // ── GRELLA DATOS DA ACTIVIDADE ──
+    set('d-den', den.trim() || '–');
+    set('d-dest', dest.trim() || '–');
+    set('d-curso', curso.trim() || '–');
+    // Data e hora saída
+    let dataSaidaTxt = dataSaida ? fmt(dataSaida) : '–';
+    if (horaSaida) dataSaidaTxt += '\n· ' + horaSaida + 'h';
+    document.getElementById('d-data-s').style.whiteSpace = 'pre-line';
+    set('d-data-s', dataSaidaTxt);
+    // Regreso
+    let dataRegresoTxt = '–';
+    if (dataRegreso) {
+      dataRegresoTxt = (dataRegreso !== dataSaida ? fmt(dataRegreso) + '\n' : '');
+      dataRegresoTxt += (horaRegreso ? '· ' + horaRegreso + 'h' : fmt(dataRegreso));
+    } else if (horaRegreso) {
+      dataRegresoTxt = '· ' + horaRegreso + 'h';
+    }
+    document.getElementById('d-data-r').style.whiteSpace = 'pre-line';
+    set('d-data-r', dataRegresoTxt);
+    // nAlum e custo
+    set('d-nalum', nAlum || '–');
+    set('d-custo', custo.trim() ? custo + ' €' : 'Gratuíta');
+    // Profesorado
+    const profField = document.getElementById('d-prof-field');
+    if (prof.trim()) { set('d-prof', prof); profField.style.display = ''; }
+    else profField.style.display = 'none';
+    // Transporte
+    const transpField = document.getElementById('d-transp-field');
+    if (transp.length > 0) { set('d-transp', transp.join(' / ')); transpField.style.display = ''; }
+    else transpField.style.display = 'none';
 
     // Material
     const matEl = document.getElementById('d-material-txt');
