@@ -270,20 +270,7 @@
     transition: background 0.2s;
   }
   .btn-docx:hover { background: #144a2c; }
-  /* Documento editable */
-  #doc-wrapper[contenteditable="true"] {
-    outline: none;
-    cursor: text;
-  }
-  #doc-wrapper[contenteditable="true"]:hover {
-    box-shadow: 0 0 0 2px #007bc433, 0 4px 24px rgba(0,123,196,0.10);
-  }
-  #doc-wrapper[contenteditable="true"]:focus-within {
-    box-shadow: 0 0 0 2px #007bc4, 0 4px 24px rgba(0,123,196,0.15);
-  }
-  @media print {
-    #doc-wrapper[contenteditable] { box-shadow: none !important; outline: none !important; }
-  }
+
 
   /* ── DOCUMENTO (autorización) ── */
   #doc-wrapper {
@@ -770,22 +757,19 @@
     <div class="preview-toolbar">
       <span class="preview-toolbar-title">📄 Previsualización do documento</span>
       <div class="toolbar-actions">
-        <span id="edit-badge" style="display:none; font-size:10px; font-weight:600; color:#b45309; background:#fef3c7; border:1px solid #fcd34d; border-radius:4px; padding:4px 8px; letter-spacing:0.03em;">
-          ✏️ Editado manualmente
-        </span>
-        <button class="btn-imprimir" id="btn-restaurar" onclick="restaurarDoc()" style="display:none; background:#b45309;">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
-          Restaurar
-        </button>
         <button class="btn-imprimir" onclick="window.print()">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
           Imprimir / PDF
+        </button>
+        <button class="btn-docx" onclick="xerarDocx()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          Descargar Word
         </button>
       </div>
     </div>
 
     <!-- DOCUMENTO AUTORIZACIÓN -->
-    <div id="doc-wrapper" contenteditable="true" spellcheck="true">
+    <div id="doc-wrapper">
 
       <!-- CABECEIRA DOCUMENTO -->
       <div class="doc-header">
@@ -895,12 +879,8 @@
     if (el) el.textContent = val || '–';
   }
 
-  let editadoManualmente = false;
-  let actualizandoPorCodigo = false;
-
   function actualizarDoc() {
-    if (editadoManualmente) return;
-    actualizandoPorCodigo = true;
+    
     const centro = document.getElementById('centro').value;
     const den = document.getElementById('denominacion').value;
     const dest = document.getElementById('destino').value;
@@ -1014,7 +994,6 @@
     set('d-data-recorte', dataSaida ? fmt(dataSaida) : '–');
     set('d-centro-recorte', centro);
     set('d-centro-lopd', centro);
-    actualizandoPorCodigo = false;
   }
 
   // Mostrar/ocultar campo "Outros"
@@ -1037,24 +1016,144 @@
   // Carga inicial
   actualizarDoc();
 
-  // Detectar edición manual no doc (ignorar cambios feitos polo propio código)
-  document.getElementById('doc-wrapper').addEventListener('input', function() {
-    if (actualizandoPorCodigo) return;
-    if (!editadoManualmente) {
-      editadoManualmente = true;
-      document.getElementById('edit-badge').style.display = 'inline-flex';
-      document.getElementById('btn-restaurar').style.display = 'inline-flex';
-    }
-  });
+  // ── XERACIÓN DE DOCX ──
+  async function xerarDocx() {
+    const btn = document.querySelector('.btn-docx');
+    btn.disabled = true;
+    btn.textContent = 'Xerando...';
 
-  // Restaurar o documento desde o formulario
-  function restaurarDoc() {
-    if (!confirm('Isto vai sobrescribir os cambios manuais. Continuar?')) return;
-    editadoManualmente = false;
-    document.getElementById('edit-badge').style.display = 'none';
-    document.getElementById('btn-restaurar').style.display = 'none';
-    actualizarDoc();
+    try {
+      // Cargar librería docx dinamicamente
+      await new Promise((resolve, reject) => {
+        if (window.docx) { resolve(); return; }
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.min.js';
+        s.onload = resolve;
+        s.onerror = reject;
+        document.head.appendChild(s);
+      });
+
+      const { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel,
+              Table, TableRow, TableCell, WidthType, BorderStyle, ShadingType,
+              PageOrientation, Header, Footer, ImageRun } = window.docx;
+
+      // Recoller datos do formulario
+      const centro   = document.getElementById('centro').value || 'CEIP Plurilingüe de Monforte de Lemos';
+      const den      = document.getElementById('denominacion').value || 'Saída escolar';
+      const dest     = document.getElementById('destino').value || '';
+      const curso    = document.getElementById('curso').value || '';
+      const dataSaida = document.getElementById('data_saida').value;
+      const dataLimite = document.getElementById('data_limite').value;
+      const custo    = document.getElementById('custo').value || '';
+      const material = document.getElementById('material').value || '';
+      const obs      = document.getElementById('observacions').value || '';
+
+      function fmt(d) {
+        if (!d) return '';
+        const [y,m,dia] = d.split('-');
+        const meses = ['xaneiro','febreiro','marzo','abril','maio','xuño','xullo','agosto','setembro','outubro','novembro','decembro'];
+        return `${parseInt(dia)} de ${meses[parseInt(m)-1]} de ${y}`;
+      }
+
+      // Transporte
+      const cbs = document.querySelectorAll('.transp-cb:checked');
+      const outrosTexto = document.getElementById('outros_texto').value.trim();
+      const transp = Array.from(cbs).map(c => c.value === 'Outros' && outrosTexto ? outrosTexto : c.value);
+
+      // Construír parágrafo narrativo
+      let texto = `Estimadas familias,\n\n`;
+      texto += `O alumnado`;
+      if (curso) texto += ` de ${curso}`;
+      texto += ` realizará a seguinte actividade: ${den}`;
+      if (dest) texto += ` en ${dest}`;
+      if (dataSaida) texto += `, o día ${fmt(dataSaida)}`;
+      texto += `.`;
+      if (transp.length) texto += ` O desprazamento realizarase en ${transp.join(' e ')}.`;
+      if (custo) texto += ` O custo da actividade é de ${custo} €.`;
+      if (dataLimite) texto += ` O importe deberá ser entregado antes do día ${fmt(dataLimite)}.`;
+      if (material) texto += `\n\nO alumnado deberá traer: ${material}.`;
+      if (obs) texto += `\n\n${obs}`;
+
+      const parrafos = texto.split('\n\n').map(p => p.trim()).filter(Boolean);
+
+      const doc = new Document({
+        sections: [{
+          properties: {
+            page: { size: { width: 11906, height: 16838 }, margin: { top: 1134, bottom: 1134, left: 1134, right: 1134 } }
+          },
+          children: [
+            // Cabeceira
+            new Paragraph({
+              children: [new TextRun({ text: centro, bold: true, size: 28, color: '005a8e' })],
+              spacing: { after: 80 }
+            }),
+            new Paragraph({
+              children: [new TextRun({ text: 'Autorización de saída escolar', size: 18, color: '5a5a5a', italics: true })],
+              spacing: { after: 200 }
+            }),
+            // Título actividade
+            new Paragraph({
+              children: [new TextRun({ text: den, bold: true, size: 36, color: '007bc4' })],
+              spacing: { after: 80 }
+            }),
+            ...(dataSaida || curso ? [new Paragraph({
+              children: [new TextRun({ text: [dataSaida ? fmt(dataSaida) : '', curso].filter(Boolean).join('  ·  '), size: 22, color: '5a5a5a' })],
+              spacing: { after: 400 }
+            })] : []),
+            // Corpo narrativo
+            ...parrafos.map((p, i) => new Paragraph({
+              children: [new TextRun({ text: p, size: 24 })],
+              spacing: { after: i < parrafos.length - 1 ? 200 : 600 },
+              alignment: AlignmentType.JUSTIFIED
+            })),
+            // Recorte - sinatura
+            new Paragraph({
+              children: [new TextRun({ text: '✂ ' + '─'.repeat(60), color: '999999', size: 18 })],
+              spacing: { before: 400, after: 300 }
+            }),
+            new Paragraph({
+              children: [new TextRun({ text: `AUTORIZACIÓN — ${den}`, bold: true, size: 22 })],
+              spacing: { after: 200 }
+            }),
+            new Paragraph({
+              children: [new TextRun({ text: `Eu, pai/nai/titor/a do/da alumno/a `, size: 22 }),
+                         new TextRun({ text: '__________________________________', size: 22 }),
+                         new TextRun({ text: ` de ${curso || '___'}`, size: 22 })],
+              spacing: { after: 160 }
+            }),
+            new Paragraph({
+              children: [new TextRun({ text: `AUTORIZO a participar en: ${den}${dest ? ' en ' + dest : ''}${dataSaida ? ' o día ' + fmt(dataSaida) : ''}.`, size: 22, bold: true })],
+              spacing: { after: 400 }
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: 'Sinatura:', size: 22 }),
+                new TextRun({ text: '                                        ', size: 22 }),
+                new TextRun({ text: `En ${centro.replace(/CEIP.*$/,'').trim() || 'Monforte de Lemos'}, a ____ de ______________ de ______`, size: 22 })
+              ],
+              spacing: { after: 200 }
+            }),
+          ]
+        }]
+      });
+
+      const blob = await Packer.toBlob(doc);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `autorizacion_${den.replace(/\s+/g,'_').toLowerCase()}.docx`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+    } catch(e) {
+      alert('Erro ao xerar o DOCX: ' + e.message);
+      console.error(e);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> Descargar Word';
+    }
   }
+
 </script>
 </body>
 </html>
