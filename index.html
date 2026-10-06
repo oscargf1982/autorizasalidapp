@@ -895,8 +895,12 @@
     if (el) el.textContent = val || '–';
   }
 
+  let editadoManualmente = false;
+  let actualizandoPorCodigo = false;
+
   function actualizarDoc() {
-    if (typeof editadoManualmente !== 'undefined' && editadoManualmente) return;
+    if (editadoManualmente) return;
+    actualizandoPorCodigo = true;
     const centro = document.getElementById('centro').value;
     const den = document.getElementById('denominacion').value;
     const dest = document.getElementById('destino').value;
@@ -1010,6 +1014,7 @@
     set('d-data-recorte', dataSaida ? fmt(dataSaida) : '–');
     set('d-centro-recorte', centro);
     set('d-centro-lopd', centro);
+    actualizandoPorCodigo = false;
   }
 
   // Mostrar/ocultar campo "Outros"
@@ -1032,9 +1037,9 @@
   // Carga inicial
   actualizarDoc();
 
-  // Detectar edición manual no doc
-  let editadoManualmente = false;
+  // Detectar edición manual no doc (ignorar cambios feitos polo propio código)
   document.getElementById('doc-wrapper').addEventListener('input', function() {
+    if (actualizandoPorCodigo) return;
     if (!editadoManualmente) {
       editadoManualmente = true;
       document.getElementById('edit-badge').style.display = 'inline-flex';
